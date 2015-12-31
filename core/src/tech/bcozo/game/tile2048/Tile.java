@@ -24,12 +24,15 @@ import tech.bcozo.game.tools.logic.ICallbackHandler;
 public class Tile extends Actor {
     private Grid grid;
     private Grid toGrid;
+    private static int tileID = 0;
     private static int count = 0;
+    private int id;
     private static Texture texture;
     private static TextureRegion[] textureRegions;
     private static TileNumbers[] tileNumbers;
     private TileNumbers number;
     private boolean moving;
+    private boolean moveComplete;
     private Tile mergeWith;
 
     private ICallbackHandler onMoveCompleteCallbackHandler;
@@ -64,6 +67,7 @@ public class Tile extends Actor {
             setWidth(textureRegions[0].getRegionWidth());
             setHeight(textureRegions[0].getRegionHeight());
         }
+        id = ++tileID;
         count++;
         this.number = number;
         this.grid = null;
@@ -87,6 +91,10 @@ public class Tile extends Actor {
         clear();
     }
 
+    public int getId() {
+        return id;
+    }
+
     public Grid getGrid() {
         return grid;
     }
@@ -96,6 +104,12 @@ public class Tile extends Actor {
             this.grid = grid;
             setPosition(grid.getX(), grid.getY());
         }
+    }
+
+    public void clearAllGrids() {
+        grid = null;
+        toGrid = null;
+        mergeWith = null;
     }
 
     public Grid getToGrid() {
@@ -109,17 +123,17 @@ public class Tile extends Actor {
         // don't allow to do
         if (moving)
             return;
-        if (toGrid != null) {
-            if (toGrid.getTile() != null) {
-                if (toGrid.getTile().getToGrid() == null) {
-                    return;
-                }
-            } else {
-                if (toGrid.getIncomingTile() != null)
-                    return;
-            }
-            toGrid.setIncomingTile(this);
-        }
+        // if (toGrid != null) {
+        // if (toGrid.getTile() != null) {
+        // if (toGrid.getTile().getToGrid() == null) {
+        // return;
+        // }
+        // } else {
+        // if (toGrid.getIncomingTile() != null)
+        // return;
+        // }
+        // toGrid.setIncomingTile(this);
+        // }
         this.toGrid = toGrid;
     }
 
@@ -166,12 +180,12 @@ public class Tile extends Actor {
     @Override
     public void clear() {
         number = null;
-        if (grid != null && grid.getTile() == this) {
-            grid.clearTile(this);
-        }
-        if (toGrid != null && grid.getIncomingTile() == this) {
-            toGrid.clearIncomingTile(this);
-        }
+        // if (grid != null && grid.getTile() == this) {
+        // grid.clearTile(this);
+        // }
+        // if (toGrid != null && grid.getIncomingTile() == this) {
+        // toGrid.clearIncomingTile(this);
+        // }
         grid = null;
         toGrid = null;
         onMoveCompleteCallbackHandler = null;
@@ -188,12 +202,13 @@ public class Tile extends Actor {
         float nextX;
         float nextY;
         if (toGrid != null) {
+            if (!moving) {
+                moving = true;
+                grid.moveCurrentTileOut();
+            }
             if (toGrid == grid) {
                 onMoveToGrid();
                 return;
-            }
-            if (!moving) {
-                moving = true;
             }
             dirX = toGrid.getColumn() < grid.getColumn() ? -1 : 1;
             dirY = toGrid.getRow() < grid.getRow() ? -1 : 1;
@@ -232,12 +247,25 @@ public class Tile extends Actor {
     private void onMoveToGrid() {
         if (moving) {
             moving = false;
+            moveComplete = true;
             // merge
             if (onMergeCompleteCallbackHandler != null) {
-                onMergeCompleteCallbackHandler.callback(this);
+                if (mergeWith != null && toGrid.getTile() == mergeWith) {
+                    try {
+                        onMergeCompleteCallbackHandler.callback(this);
+                    } catch (Exception e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
             }
             if (onMoveCompleteCallbackHandler != null) {
-                onMoveCompleteCallbackHandler.callback(this);
+                try {
+                    onMoveCompleteCallbackHandler.callback(this);
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
             }
         }
     }
@@ -248,5 +276,24 @@ public class Tile extends Actor {
 
     public void onMergeComplete(ICallbackHandler callbackHandler) {
         onMergeCompleteCallbackHandler = callbackHandler;
+    }
+
+    public void setMergeWith(Tile mergeWith) {
+        this.mergeWith = mergeWith;
+    }
+
+    @Override
+    public String toString() {
+        String msg = "Tile[id:" + id + ", number:" + number.getNumber();
+        if (grid != null) {
+            msg += ", at:" + grid;
+        }
+        if (toGrid != null) {
+            msg += ", to:" + toGrid;
+        }
+        if (mergeWith != null) {
+            msg += ", mergeWith:" + mergeWith.getId();
+        }
+        return msg + "]";
     }
 }

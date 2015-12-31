@@ -163,38 +163,27 @@ public class GameScreen extends ScreenAdapter {
 
     @Override
     public void render(float delta) {
-        renderTimer += delta;
+        boolean renderTimeout = false;
         Controller nextDirection = null;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
-            nextDirection = Controller.UP;
-        } else if (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)) {
-            nextDirection = Controller.RIGHT;
-        } else if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
-            nextDirection = Controller.DOWN;
-        } else if (Gdx.input.isKeyJustPressed(Input.Keys.LEFT)) {
-            nextDirection = Controller.LEFT;
+        renderTimer += delta;
+        if (renderTimer > 1) {
+            renderTimer = 0;
+            renderTimeout = true;
         }
         switch (gameState) {
         case STOP:
+            nextDirection = checkInputDirection();
             if (nextDirection != null) {
                 moveDirection = nextDirection;
                 startGame();
             } else {
-                if (renderTimer > 1) {
-                    renderTimer = 0;
+                if (renderTimeout) {
                     updateDemoLogic();
                 }
             }
             break;
-        case GAME_OVER:
-            if (renderTimer > 1) {
-                renderTimer = 0;
-                if (++gameOverIdleTimer >= GameConfig.GAME_OVER_IDLE_TIME) {
-                    stopGame();
-                }
-            }
-            break;
         case PLAYING:
+            nextDirection = checkInputDirection();
             if (nextDirection != null) {
                 moveDirection = nextDirection;
                 updateGameLogic();
@@ -203,6 +192,13 @@ public class GameScreen extends ScreenAdapter {
         case MOVING:
             checkMoveComplete();
             break;
+        case GAME_OVER:
+            if (renderTimeout) {
+                if (++gameOverIdleTimer >= GameConfig.GAME_OVER_IDLE_TIME) {
+                    stopGame();
+                }
+            }
+            break;
         default:
             break;
         }
@@ -210,16 +206,18 @@ public class GameScreen extends ScreenAdapter {
         stage.draw();
     }
 
-    private void stopGame() {
-        for (Tile tile : tiles) {
-            tile.clear();
+    private Controller checkInputDirection() {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
+            return Controller.UP;
+        } else if (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)) {
+            return Controller.RIGHT;
+        } else if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
+            return Controller.DOWN;
+        } else if (Gdx.input.isKeyJustPressed(Input.Keys.LEFT)) {
+            return Controller.LEFT;
+        } else {
+            return null;
         }
-        Tile removedTile;
-        while (tiles.size() > 0) {
-            removedTile = tiles.remove(tiles.size() - 1);
-            removedTile.dispose();
-        }
-        showDemo();
     }
 
     private void showDemo() {
@@ -243,10 +241,6 @@ public class GameScreen extends ScreenAdapter {
                 break;
             }
         }
-        //
-        // tileGroup.addActor(randTile2);
-        // tileGrids.addTileToGrid(randTile2, GameConfig.TILE_ROWS - 1,
-        // GameConfig.TILE_COLUMNS - 1);
     }
 
     private void updateDemoLogic() {
@@ -257,8 +251,58 @@ public class GameScreen extends ScreenAdapter {
         }
     }
 
-    private void resetGame() {
-
+    private void randomMove(Tile tile) {
+        boolean canMove;
+        int rand;
+        Grid next = tile.getGrid();
+        boolean canMoveUp = true;
+        boolean canMoveRight = true;
+        boolean canMoveDown = true;
+        boolean canMoveLeft = true;
+        if (next == null)
+            return;
+        do {
+            canMove = true;
+            rand = MathUtils.random(RAND_MOVE_RIGHT);
+            switch (rand) {
+            case RAND_MOVE_UP:
+                next = tileGrids.getTopNextAvailableGrid(tile.getGrid());
+                if (next == null || next == tile.getGrid()
+                        || (next.hasTile() && !next.hasMovingOutTile())
+                        || next.hasIncomingTile()) {
+                    canMoveUp = canMove = false;
+                }
+                break;
+            case RAND_MOVE_RIGHT:
+                next = tileGrids.getRightNextAvailableGrid(tile.getGrid());
+                if (next == null || next == tile.getGrid()
+                        || (next.hasTile() && !next.hasMovingOutTile())
+                        || next.hasIncomingTile()) {
+                    canMoveRight = canMove = false;
+                }
+                break;
+            case RAND_MOVE_DOWN:
+                next = tileGrids.getBottomNextAvailableGrid(tile.getGrid());
+                if (next == null || next == tile.getGrid()
+                        || (next.hasTile() && !next.hasMovingOutTile())
+                        || next.hasIncomingTile()) {
+                    canMoveDown = canMove = false;
+                }
+                break;
+            case RAND_MOVE_LEFT:
+                next = tileGrids.getLeftNextAvailableGrid(tile.getGrid());
+                if (next == null || next == tile.getGrid()
+                        || (next.hasTile() && !next.hasMovingOutTile())
+                        || next.hasIncomingTile()) {
+                    canMoveLeft = canMove = false;
+                }
+                break;
+            }
+            if (!(canMoveUp || canMoveRight || canMoveDown || canMoveLeft))
+                return;
+        } while (!canMove);
+        tile.setToGrid(next);
+        next.setIncomingTile(tile);
     }
 
     private void startGame() {
@@ -270,12 +314,30 @@ public class GameScreen extends ScreenAdapter {
         tileGrids.clear();
         gameState = GameState.PLAYING;
         addNewTiles();
-        // updateGameLogic();
     }
 
-    private void endGame() {
-        gameState = GameState.GAME_OVER;
-        gameOverIdleTimer = 0;
+    private void stopGame() {
+        Tile removedTile;
+        while (tiles.size() > 0) {
+            removedTile = tiles.remove(tiles.size() - 1);
+            tileGroup.removeActor(removedTile);
+            if (removedTile.getGrid() != null) {
+                removedTile.getGrid().clear();
+            }
+            removedTile.dispose();
+        }
+        while (freeTiles.size() > 0) {
+            removedTile = freeTiles.remove(freeTiles.size() - 1);
+            if (removedTile.getGrid() != null) {
+                removedTile.getGrid().clear();
+            }
+            removedTile.dispose();
+        }
+        showDemo();
+    }
+
+    private void resetGame() {
+
     }
 
     private void updateGameLogic() {
@@ -283,7 +345,6 @@ public class GameScreen extends ScreenAdapter {
         int col;
         boolean canMove = false;
         Grid fromGrid;
-        Grid toGrid;
         switch (moveDirection) {
         case UP:
             // scan from top to bottom
@@ -291,15 +352,9 @@ public class GameScreen extends ScreenAdapter {
                 // scan from left to right
                 for (col = 0; col < tileGrids.getColumns(); col++) {
                     fromGrid = tileGrids.getGrid(row, col);
-                    if (fromGrid.getTile() != null) {
-                        toGrid = tileGrids.getTopMostAvailableGrid(fromGrid);
-                        toGrid = updateMoveTileLogic(fromGrid, toGrid);
-                        if (!canMove && (fromGrid.getTile() == toGrid
-                                .getIncomingTile()
-                                || fromGrid.getTile().getMergeWith() == toGrid
-                                        .getTile())) {
-                            canMove = true;
-                        }
+                    if (fromGrid.getTile() != null
+                            && updateMoveTileLogic(fromGrid) && !canMove) {
+                        canMove = true;
                     }
                 }
             }
@@ -310,13 +365,9 @@ public class GameScreen extends ScreenAdapter {
                 // scan from bottom to top
                 for (row = 0; row < tileGrids.getRows(); row++) {
                     fromGrid = tileGrids.getGrid(row, col);
-                    if (fromGrid.getTile() != null) {
-                        toGrid = tileGrids.getRightMostAvailableGrid(fromGrid);
-                        toGrid = updateMoveTileLogic(fromGrid, toGrid);
-                        if (!canMove && fromGrid.getTile() == toGrid
-                                .getIncomingTile()) {
-                            canMove = true;
-                        }
+                    if (fromGrid.getTile() != null
+                            && updateMoveTileLogic(fromGrid) && !canMove) {
+                        canMove = true;
                     }
                 }
             }
@@ -327,13 +378,9 @@ public class GameScreen extends ScreenAdapter {
                 // scan from left to right
                 for (col = 0; col < tileGrids.getColumns(); col++) {
                     fromGrid = tileGrids.getGrid(row, col);
-                    if (fromGrid.getTile() != null) {
-                        toGrid = tileGrids.getBottomMostAvailableGrid(fromGrid);
-                        toGrid = updateMoveTileLogic(fromGrid, toGrid);
-                        if (!canMove && fromGrid.getTile() == toGrid
-                                .getIncomingTile()) {
-                            canMove = true;
-                        }
+                    if (fromGrid.getTile() != null
+                            && updateMoveTileLogic(fromGrid) && !canMove) {
+                        canMove = true;
                     }
                 }
             }
@@ -344,13 +391,9 @@ public class GameScreen extends ScreenAdapter {
                 // scan from bottom to top
                 for (row = 0; row < tileGrids.getRows(); row++) {
                     fromGrid = tileGrids.getGrid(row, col);
-                    if (fromGrid.getTile() != null) {
-                        toGrid = tileGrids.getLeftMostAvailableGrid(fromGrid);
-                        toGrid = updateMoveTileLogic(fromGrid, toGrid);
-                        if (!canMove && fromGrid.getTile() == toGrid
-                                .getIncomingTile()) {
-                            canMove = true;
-                        }
+                    if (fromGrid.getTile() != null
+                            && updateMoveTileLogic(fromGrid) && !canMove) {
+                        canMove = true;
                     }
                 }
             }
@@ -373,112 +416,12 @@ public class GameScreen extends ScreenAdapter {
         }
     }
 
-    /**
-     * <p>
-     * update the logic of moving a tile from <b>fromGrid</b> to <b>toGrid</b>
-     * described as follow:<br>
-     * 1.don't move if they are the same grid.<br>
-     * 2.perform a simple movement if <b>toGrid</b> is valid to move into.<br>
-     * 3.perform a movement with merge if <b>toGrid</b> has the same number of
-     * <b>fromGrid</b>. <br>
-     * 4.perform a simple movement to the grid next to <b>toGrid</b> on the same
-     * direction.<br>
-     * </p>
-     * 
-     * @param fromGrid
-     * @param toGrid
-     * @return Grid
-     */
-    private Grid updateMoveTileLogic(Grid fromGrid, Grid toGrid) {
-        // if fromGrid is on the edge, do nothing to it.
-        if (toGrid == fromGrid) {
-            return toGrid;
-        }
-        // if toGrid doesn't contain a tile
-        if (toGrid.getTile() == null) {
-            // if no other tile will
-            // move into it, move the tile from fromGrid to toGrid.
-            if (toGrid.getIncomingTile() == null) {
-                fromGrid.getTile().setToGrid(toGrid);
-                return toGrid;
-            } else {
-                // if other tile will move into it
-                if (canMerge(fromGrid.getTile(), toGrid.getIncomingTile())) {
-                    fromGrid.getTile().mergeToGridWithIncomingTile(toGrid);
-                    return toGrid;
-                }
-
-            }
-        } else {
-            // if toGrid contains a tile
-            // but if no other tile will move(or merge) into the toGrid
-            if (toGrid.getIncomingTile() == null) {
-                // if the tile in toGrid is moving out, move the tile from
-                // fromGrid to toGrid.
-                if (toGrid.getTile().getToGrid() != null) {
-                    fromGrid.getTile().setToGrid(toGrid);
-                    return toGrid;
-                } else if (canMerge(fromGrid, toGrid)) {
-                    // if toGrid can be merged into
-                    fromGrid.getTile().mergeToGrid(toGrid);
-                    return toGrid;
-                }
-            } else {// if other tile is moving into the toGrid
-
-            }
-        }
-        // if fromGrid cannot move into toGrid in any case above, try to
-        // move to the grid before toGrid.
-        // if the grid before toGrid is fromGrid itself, do nothing to it.
-        // if (toGrid.getTile() == null || toGrid.getIncomingTile() == null) {
-        int row = 0;
-        int col = 0;
-        switch (moveDirection) {
-        case UP:
-            row = toGrid.getRow() - 1;
-            col = toGrid.getColumn();
-            break;
-        case RIGHT:
-            row = toGrid.getRow();
-            col = toGrid.getColumn() - 1;
-            break;
-        case DOWN:
-            row = toGrid.getRow() + 1;
-            col = toGrid.getColumn();
-            break;
-        case LEFT:
-            row = toGrid.getRow();
-            col = toGrid.getColumn() + 1;
-            break;
-        default:
-            break;
-        }
-        Grid grid = tileGrids.getGrid(row, col);
-        fromGrid.getTile().setToGrid(grid);
-        return grid;
-        // } else {
-        // return toGrid;
-        // }
-    }
-
-    private boolean canMerge(Grid fromGrid, Grid toGrid) {
-        if (fromGrid == null || toGrid == null || fromGrid.getTile() == null
-                || toGrid.getTile() == null)
-            return false;
-        if (toGrid.getIncomingTile() != null && toGrid.getTile() != null
-                && toGrid.getIncomingTile().getMergeWith() == toGrid
-                        .getTile()) {
-            return false;
-        }
-        return canMerge(fromGrid.getTile(), toGrid.getTile());
-    }
-
     public static boolean canMerge(Tile tileA, Tile tileB) {
         return tileA != null && tileB != null
                 && tileA.getNumber() == tileB.getNumber();
     }
 
-    private void addNewTiles() {
+    private boolean addNewTiles() {
         int count = 0;
         int row = 0;
         int col = 0;
@@ -520,6 +463,16 @@ public class GameScreen extends ScreenAdapter {
                 col = GameConfig.TILE_COLUMNS - 1;
                 newPos = row;
                 break;
+            case DOWNLEFT:
+                break;
+            case DOWNRIGHT:
+                break;
+            case UPLEFT:
+                break;
+            case UPRIGHT:
+                break;
+            default:
+                break;
             }
             if (positions.contains(newPos)) {
                 positions.remove(positions.indexOf(newPos));
@@ -538,8 +491,7 @@ public class GameScreen extends ScreenAdapter {
                 }
             }
         }
-        if (!canAdd)
-            endGame();
+        return canAdd;
     }
 
     private Tile allocTile() {
@@ -558,157 +510,165 @@ public class GameScreen extends ScreenAdapter {
                 break;
             }
         }
-        if (!moving)
-            onMoveComplete();
+        // on tiles move complete
+        if (!moving) {
+            // try add new tiles
+            if (!addNewTiles()) {
+                gameOverIdleTimer = 0;
+                gameState = GameState.GAME_OVER;
+            } else {
+                gameState = GameState.PLAYING;
+            }
+        }
     }
 
-    private void onMoveComplete() {
-        // // check game over
-        // if (tiles.size() == tileGrids.getSize()) {
-        // gameState = GameState.GAME_OVER;
-        // return;
-        // }
-        addNewTiles();
-        gameState = GameState.PLAYING;
-    }
-
-    // private void move(Controller direction) {
-    // Controller edge;
-    // switch (direction) {
-    // case UP:
-    // for (Tile tile : tiles) {
-    // edge = tileGrids.checkOnEdge(tile);
-    // if (edge == Controller.UP || edge == Controller.UPLEFT
-    // || edge == Controller.UPRIGHT)
-    // continue;
-    // else {
-    // moveTile(tile, Controller.UP);
-    // }
-    // }
-    // break;
-    // case RIGHT:
-    // for (Tile tile : tiles) {
-    // edge = tileGrids.checkOnEdge(tile);
-    // if (edge == Controller.RIGHT || edge == Controller.UPRIGHT
-    // || edge == Controller.DOWNRIGHT)
-    // continue;
-    // else {
-    // moveTile(tile, Controller.RIGHT);
-    // }
-    // }
-    // break;
-    // case DOWN:
-    // for (Tile tile : tiles) {
-    // edge = tileGrids.checkOnEdge(tile);
-    // if (edge == Controller.DOWN || edge == Controller.DOWNRIGHT
-    // || edge == Controller.DOWNLEFT)
-    // continue;
-    // else {
-    // moveTile(tile, Controller.DOWN);
-    // }
-    // }
-    // break;
-    // case LEFT:
-    // for (Tile tile : tiles) {
-    // edge = tileGrids.checkOnEdge(tile);
-    // if (edge == Controller.LEFT || edge == Controller.UPLEFT
-    // || edge == Controller.DOWNLEFT)
-    // continue;
-    // else {
-    // moveTile(tile, Controller.LEFT);
-    // }
-    // }
-    // break;
-    // default:
-    // break;
-    // }
-    // }
-
-    private void randomMove(Tile tile) {
-        boolean canMove;
-        int rand;
-        Grid next = tile.getGrid();
-        boolean canMoveUp = true;
-        boolean canMoveRight = true;
-        boolean canMoveDown = true;
-        boolean canMoveLeft = true;
-        do {
-            canMove = true;
-            rand = MathUtils.random(RAND_MOVE_RIGHT);
-            switch (rand) {
-            case RAND_MOVE_UP:
-                next = tileGrids.getTopNextAvailableGrid(tile.getGrid());
-                if (next == null || next == tile.getGrid()
-                        || next.getTile() != null
-                        || next.getIncomingTile() != null) {
-                    canMoveUp = canMove = false;
-                }
+    /**
+     * <p>
+     * update the logic of moving a tile from <b>grid</b> to the next grid in
+     * the game move direction where possible.
+     * </p>
+     * 
+     * @param grid
+     * @return boolean
+     */
+    public boolean updateMoveTileLogic(Grid grid) {
+        Grid prev = grid;
+        Grid current;
+        Grid next;
+        boolean canMove = false;
+        switch (moveDirection) {
+        case UP:
+            current = tileGrids.getTopNextAvailableGrid(grid);
+            break;
+        case RIGHT:
+            current = tileGrids.getRightNextAvailableGrid(grid);
+            break;
+        case DOWN:
+            current = tileGrids.getBottomNextAvailableGrid(grid);
+            break;
+        case LEFT:
+            current = tileGrids.getLeftNextAvailableGrid(grid);
+            break;
+        default:
+            return canMove;
+        }
+        if (current == null)
+            return false;
+        while (true) {
+            // is there a tile in this grid and not about to move out?
+            if (current.hasTile() && !current.hasMovingOutTile()) {
                 break;
-            case RAND_MOVE_RIGHT:
-                next = tileGrids.getRightNextAvailableGrid(tile.getGrid());
-                if (next == null || next == tile.getGrid()
-                        || next.getTile() != null
-                        || next.getIncomingTile() != null) {
-                    canMoveRight = canMove = false;
-                }
-                break;
-            case RAND_MOVE_DOWN:
-                next = tileGrids.getBottomNextAvailableGrid(tile.getGrid());
-                if (next == null || next == tile.getGrid()
-                        || next.getTile() != null
-                        || next.getIncomingTile() != null) {
-                    canMoveDown = canMove = false;
-                }
-                break;
-            case RAND_MOVE_LEFT:
-                next = tileGrids.getLeftNextAvailableGrid(tile.getGrid());
-                if (next == null || next == tile.getGrid()
-                        || next.getTile() != null
-                        || next.getIncomingTile() != null) {
-                    canMoveLeft = canMove = false;
-                }
+                // is other tile moving in this grid?
+            } else if (current.hasIncomingTile()) {
                 break;
             }
-            if (!(canMoveUp || canMoveRight || canMoveDown || canMoveLeft))
-                return;
-        } while (!canMove);
-        moveTile(tile, next);
-    }
+            switch (moveDirection) {
+            case UP:
+                next = tileGrids.getTopNextAvailableGrid(current);
+                break;
+            case RIGHT:
+                next = tileGrids.getRightNextAvailableGrid(current);
+                break;
+            case DOWN:
+                next = tileGrids.getBottomNextAvailableGrid(current);
+                break;
+            case LEFT:
+                next = tileGrids.getLeftNextAvailableGrid(current);
+                break;
+            default:
+                return canMove;
+            }
+            if (next == null) {
+                break;
+            } else {
+                prev = current;
+                current = next;
+                next = null;
+            }
+        }
+        // after the while loop above, there must be a tile in the 'current'
+        // grid in two cases:
+        // another tile is merging in/another tile is coming in/not moving out
 
-    private void moveTile(Tile tile, Grid grid) {
-        tile.setToGrid(grid);
-    }
-
-    private void onTileMoveComplete(Tile tile) {
-        Grid grid = tile.getGrid();
-        Grid toGrid = tile.getToGrid();
-        // unlink the grid and this tile
-        if (grid != null && grid.getTile() == tile) {
-            grid.clearTile(tile);
+        // if 'current' grid has a merging in tile
+        if (current.hasMergingInTile()) {
+            // not move in it but move in 'prev'
+            // 'prev' is empty (because it is checked as 'can get through'
+            grid.getTile().setToGrid(prev);
+            prev.setIncomingTile(grid.getTile());
+            canMove = true;
         }
-        // reset the incoming tile for the toGrid
-        if (toGrid != null && toGrid.getIncomingTile() == tile) {
-            toGrid.clearIncomingTile(tile);
+        // if 'current' grid has an incoming tile
+        else if (current.hasIncomingTile()) {
+            // can merge with the incoming tile in the target grid?
+            if (MergeRule.canMergeOnSameNumber(grid.getTile(),
+                    current.getIncomingTile())) {
+                grid.getTile().setToGrid(current);
+                current.setMergeIn(grid.getTile());
+                grid.getTile().setMergeWith(current.getIncomingTile());
+                canMove = true;
+            } else {
+                // not move in it but move in 'prev'
+                // 'prev' is empty (because it is checked as 'can get through'
+                grid.getTile().setToGrid(prev);
+                prev.setIncomingTile(grid.getTile());
+                canMove = true;
+            }
+        } else {
+            if (current.hasTile()) {
+                // can merge with the tile in the target grid?
+                if (MergeRule.canMergeOnSameNumber(grid.getTile(),
+                        current.getTile())) {
+                    grid.getTile().setToGrid(current);
+                    current.setMergeIn(grid.getTile());
+                    grid.getTile().setMergeWith(current.getTile());
+                    canMove = true;
+                } else {
+                    // move into the 'prev' grid
+                    grid.getTile().setToGrid(prev);
+                    prev.setIncomingTile(grid.getTile());
+                    canMove = true;
+                }
+            } else {
+                // move into the current grid
+                grid.getTile().setToGrid(current);
+                current.setIncomingTile(grid.getTile());
+                canMove = true;
+            }
         }
-        // link this tile and the toGrid
-        if (toGrid != null) {
-            // update the tile
-            tile.setGrid(toGrid);
-            tile.setToGrid(null);
-            // update the grid
-            toGrid.setTile(tile);
-        }
+        return canMove;
     }
 
     private class DemoTileMoveCallbackHandler implements ICallbackHandler {
 
         @Override
-        public void callback(Object callObject) {
+        public void callback(Object callObject) throws Exception {
             if (!(callObject instanceof Tile)) {
                 return;
             }
             Tile tile = (Tile) callObject;
-            onTileMoveComplete(tile);
+            Grid grid = tile.getGrid();
+            Grid toGrid = tile.getToGrid();
+            // unlink the grid and this tile
+            // if (grid != null && grid.getTile() != tile) {
+            // throw new GridTileNotMatchException(toGrid, tile,
+            // "Cannot Clear In-Grid State");
+            // }
+            // grid.clearTile(tile);
+            grid.clearMovingOutTile();
+            // reset the incoming tile for the toGrid
+            if (toGrid != null && toGrid.hasIncomingTile()
+                    && toGrid.getIncomingTile() != tile) {
+                throw new GridTileNotMatchException(toGrid, tile,
+                        "Cannot Clear Incoming-Grid State");
+            }
+            toGrid.clearIncomingTile(tile);
+            // link this tile and the toGrid
+            // update the tile
+            tile.setGrid(toGrid);
+            tile.setToGrid(null);
+            // update the grid
+            toGrid.setTile(tile);
             tile.setNumber(TileNumbers.getNumberByOrdinal(
                     MathUtils.random(TileNumbers.values().length - 1)));
         }
@@ -718,12 +678,36 @@ public class GameScreen extends ScreenAdapter {
     private class TileMoveCallbackHandler implements ICallbackHandler {
 
         @Override
-        public void callback(Object callObject) {
+        public void callback(Object callObject) throws Exception {
             if (!(callObject instanceof Tile)) {
                 return;
             }
             Tile tile = (Tile) callObject;
-            onTileMoveComplete(tile);
+            Grid grid = tile.getGrid();
+            Grid toGrid = tile.getToGrid();
+            // unlink the grid and this tile
+            // if (grid != null && grid.getTile() != tile) {
+            // throw new GridTileNotMatchException(toGrid, tile,
+            // "Cannot Clear In-Grid State");
+            // }
+            // grid.clearTile(tile);
+            grid.clearMovingOutTile();
+            // reset the incoming tile for the toGrid
+            if (toGrid != null) {
+                if (toGrid.hasIncomingTile()
+                        && toGrid.getIncomingTile() != tile) {
+                    throw new GridTileNotMatchException(toGrid, tile,
+                            "Cannot Clear Incoming-Grid State");
+                } else {
+                    toGrid.clearIncomingTile(tile);
+                }
+            }
+            // link this tile and the toGrid
+            // update the tile
+            tile.setGrid(toGrid);
+            tile.setToGrid(null);
+            // update the grid
+            toGrid.setTile(tile);
         }
 
     }
@@ -731,12 +715,13 @@ public class GameScreen extends ScreenAdapter {
     private class TileMergeCallbackHandler implements ICallbackHandler {
 
         @Override
-        public void callback(Object callObject) {
+        public void callback(Object callObject) throws Exception {
             if (!(callObject instanceof Tile)) {
                 return;
             }
             Tile tile = (Tile) callObject;
             Tile mergeWith = tile.getMergeWith();
+            Grid toGrid = tile.getToGrid();
             TileNumbers addNumber;
             if (mergeWith == null) {
                 // tile.setMergeWith(null);
@@ -746,6 +731,12 @@ public class GameScreen extends ScreenAdapter {
                     + mergeWith.getNumber().getNumber());
             // clear and recycle the merged tile
             mergeWith.clear();
+            // reset the merging in tile for the toGrid
+            if (toGrid != null && toGrid.getMergeInTile() != tile) {
+                throw new GridTileNotMatchException(toGrid, tile,
+                        "Cannot Clear Merge-In-Grid State");
+            }
+            toGrid.clear();
             tileGroup.removeActor(mergeWith);
             tiles.remove(mergeWith);
             freeTiles.add(mergeWith);
@@ -756,6 +747,24 @@ public class GameScreen extends ScreenAdapter {
             tile.clearMergeWith();
         }
 
+    }
+
+    private class GridTileNotMatchException extends Exception {
+        private static final long serialVersionUID = -1424249667250825460L;
+        private Grid grid;
+        private Tile tile;
+
+        public GridTileNotMatchException(Grid grid, Tile tile, String msg) {
+            super(msg);
+            this.grid = grid;
+            this.tile = tile;
+        }
+
+        @Override
+        public String getMessage() {
+            // TODO Auto-generated method stub
+            return super.getMessage() + " at " + grid + ", with " + tile;
+        }
     }
 
     private enum GameState {

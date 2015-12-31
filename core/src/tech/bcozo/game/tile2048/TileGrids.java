@@ -73,7 +73,7 @@ public class TileGrids {
     }
 
     public int getTop() {
-        return y;
+        return top;
     }
 
     public int getBottom() {
@@ -98,6 +98,24 @@ public class TileGrids {
 
     public int getSize() {
         return size;
+    }
+
+    public Grid[] getGridsAtRow(int row) {
+        if (row >= 0 && row < rows) {
+            return grids[row];
+        } else
+            return null;
+    }
+
+    public Grid[] getGridsAtColumn(int col) {
+        if (col >= 0 && col < columns) {
+            Grid[] atCol = new Grid[rows];
+            for (int i = 0; i < rows; i++) {
+                atCol[i] = grids[i][col];
+            }
+            return atCol;
+        } else
+            return null;
     }
 
     public void clear() {
@@ -153,10 +171,6 @@ public class TileGrids {
     public void addTileToGrid(Tile tile, int row, int column) {
         tile.setGrid(grids[row][column]);
         grids[row][column].setTile(tile);
-    }
-
-    public Tile getTileAtGrid(int row, int column) {
-        return getGrid(row, column).getTile();
     }
 
     /**
@@ -227,169 +241,5 @@ public class TileGrids {
         if (grid.getColumn() == columns - 1)
             return null;
         return getGrid(grid.getRow(), grid.getColumn() + 1);
-    }
-
-    /**
-     * <p>
-     * Get the farthest grid above<br>
-     * Return:<br>
-     * <b>the farthest grid</b> - if there exists one.<br>
-     * <b>the grid itself</b> - if there isn't any grid available in this
-     * direction.
-     * </p>
-     * 
-     * @param grid
-     * @return Grid
-     */
-    public Grid getTopMostAvailableGrid(Grid grid) {
-        Grid original = grid;
-        Grid current = grid;
-        Grid next = getTopNextAvailableGrid(current);
-        while (next != null) {
-            // if next grid contains a tile, and the tile won't move to any
-            // other grid.
-            if (next.getTile() != null && next.getTile().getToGrid() == null) {
-                return next;
-            }
-            // if next grid doesn't contain a tile, but there is another tile
-            // moving into it.
-            if (next.getTile() == null && next.getIncomingTile() != null) {
-                // if the incoming tile can be merged with the original one
-                if (GameScreen.canMerge(next.getIncomingTile(),
-                        original.getTile())) {
-                    return next;
-                } else {
-                    return current;
-                }
-            }
-            // if next grid doesn't contain a tile, and no tile is moving into
-            // it, memorizes it, then find next possible grid.
-            current = next;
-            next = getTopNextAvailableGrid(current);
-        }
-        return current;
-    }
-
-    /**
-     * <p>
-     * Get the farthest grid above<br>
-     * Return:<br>
-     * <b>the farthest grid</b> - if there exists one.<br>
-     * <b>the grid itself</b> - if there isn't any grid available in this
-     * direction.
-     * </p>
-     * 
-     * @param grid
-     * @return Grid
-     */
-    public Grid getBottomMostAvailableGrid(Grid grid) {
-        Grid original = grid;
-        Grid current = grid;
-        Grid next = getBottomNextAvailableGrid(current);
-        while (next != null) {
-            // if next grid contains a tile, and the tile won't move to any
-            // other grid.
-            if (next.getTile() != null && next.getTile().getToGrid() == null) {
-                return next;
-            }
-            // if next grid doesn't contain a tile, but there is another tile
-            // moving into it.
-            if (next.getTile() == null && next.getIncomingTile() != null) {
-                // if the incoming tile can be merged with the original one
-                if (GameScreen.canMerge(next.getIncomingTile(),
-                        original.getTile())) {
-                    return next;
-                } else {
-                    return current;
-                }
-            }
-            // if next grid doesn't contain a tile, and no tile is moving into
-            // it, memorizes it, then find next possible grid.
-            current = next;
-            next = getBottomNextAvailableGrid(current);
-        }
-        return current;
-    }
-
-    /**
-     * <p>
-     * Get the farthest grid above<br>
-     * Return:<br>
-     * <b>the farthest grid</b> - if there exists one.<br>
-     * <b>the grid itself</b> - if there isn't any grid available in this
-     * direction.
-     * </p>
-     * 
-     * @param grid
-     * @return Grid
-     */
-    public Grid getLeftMostAvailableGrid(Grid grid) {
-        Grid original = grid;
-        Grid current = grid;
-        Grid next = getLeftNextAvailableGrid(current);
-        while (next != null) {
-            // if next grid contains a tile, and the tile won't move to any
-            // other grid.
-            if (next.getTile() != null && next.getTile().getToGrid() == null) {
-                return next;
-            }
-            // if next grid doesn't contain a tile, but there is another tile
-            // moving into it.
-            if (next.getTile() == null && next.getIncomingTile() != null) {
-                // if the incoming tile can be merged with the original one
-                if (GameScreen.canMerge(next.getIncomingTile(),
-                        original.getTile())) {
-                    return next;
-                } else {
-                    return current;
-                }
-            }
-            // if next grid doesn't contain a tile, and no tile is moving into
-            // it, memorizes it, then find next possible grid.
-            current = next;
-            next = getLeftNextAvailableGrid(current);
-        }
-        return current;
-    }
-
-    /**
-     * <p>
-     * Get the farthest grid above<br>
-     * Return:<br>
-     * <b>the farthest grid</b> - if there exists one.<br>
-     * <b>the grid itself</b> - if there isn't any grid available in this
-     * direction.
-     * </p>
-     * 
-     * @param grid
-     * @return Grid
-     */
-    public Grid getRightMostAvailableGrid(Grid grid) {
-        Grid original = grid;
-        Grid current = grid;
-        Grid next = getRightNextAvailableGrid(current);
-        while (next != null) {
-            // if next grid contains a tile, and the tile won't move to any
-            // other grid.
-            if (next.getTile() != null && next.getTile().getToGrid() == null) {
-                return next;
-            }
-            // if next grid doesn't contain a tile, but there is another tile
-            // moving into it.
-            if (next.getTile() == null && next.getIncomingTile() != null) {
-                // if the incoming tile can be merged with the original one
-                if (GameScreen.canMerge(next.getIncomingTile(),
-                        original.getTile())) {
-                    return next;
-                } else {
-                    return current;
-                }
-            }
-            // if next grid doesn't contain a tile, and no tile is moving into
-            // it, memorizes it, then find next possible grid.
-            current = next;
-            next = getRightNextAvailableGrid(current);
-        }
-        return current;
     }
 }

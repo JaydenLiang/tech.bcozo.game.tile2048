@@ -22,7 +22,7 @@ public class GameConfig {
     public static final String TILE_TEXTURE_REGSET = "tilefont02_regset.txt";
     public static final int FOREGROUND_MASK_POSX = 35;
     public static final int FOREGROUND_MASK_POSY = 33;
-    public static final int GAME_OVER_IDLE_TIME = 1000;
+    public static final int GAME_OVER_IDLE_TIME = 10;
     public static final int GAME_ADD_TILES_ON_DEMO = 4;
     // add how many tiles at maximum on each move
     public static final int GAME_ADD_TILES_ON_MOVE = 2;
